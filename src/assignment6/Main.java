@@ -8,16 +8,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Entry point for the insurance company communication generator.
+ * Main entry point for Assignment 6.
+ *
+ * This program reads customer data from a CSV file and generates
+ * emails, letters, or both, based on the provided command line arguments.
  */
-public final class Main {
-
-    private Main() {
-        // Prevent instantiation.
-    }
+public class Main {
 
     /**
-     * Runs the program using command line arguments.
+     * Runs the program.
      *
      * @param args command line arguments
      */
@@ -26,47 +25,74 @@ public final class Main {
             Config config = parseArguments(args);
             generateFiles(config);
             System.out.println("Files generated successfully.");
-        } catch (IllegalArgumentException e) {
-            System.out.println("Error: " + e.getMessage());
-            System.out.println();
+        } catch (IllegalArgumentException exception) {
+            System.err.println("Error: " + exception.getMessage());
             printUsage();
-        } catch (IOException e) {
-            System.out.println("Error: " + e.getMessage());
+        } catch (IOException exception) {
+            System.err.println("I/O Error: " + exception.getMessage());
         }
     }
 
+    /**
+     * Generates all requested files.
+     *
+     * @param config parsed command line configuration
+     * @throws IOException if reading or writing files fails
+     */
     private static void generateFiles(Config config) throws IOException {
-        List<Map<String, String>> data = CsvReader.read(config.csvFile);
+        List<Map<String, String>> records = CsvReader.read(config.csvFile);
 
-        String emailTemplate = null;
-        String letterTemplate = null;
+        String emailTemplateContent = null;
+        String letterTemplateContent = null;
 
         if (config.generateEmail) {
-            emailTemplate = Files.readString(Path.of(config.emailTemplate), StandardCharsets.UTF_8);
+            emailTemplateContent = readFileContent(config.emailTemplate);
         }
+
         if (config.generateLetter) {
-            letterTemplate = Files.readString(Path.of(config.letterTemplate), StandardCharsets.UTF_8);
+            letterTemplateContent = readFileContent(config.letterTemplate);
         }
 
-        for (int i = 0; i < data.size(); i++) {
-            Map<String, String> row = data.get(i);
-            int fileNumber = i + 1;
-
+        int fileNumber = 1;
+        for (Map<String, String> row : records) {
             if (config.generateEmail) {
-                String filledEmail = TemplateProcessor.fillTemplate(emailTemplate, row);
-                FileGenerator.writeToFile(config.outputDir,
-                    "email-" + fileNumber + ".txt", filledEmail);
+                String filledEmail = TemplateProcessor.fillTemplate(emailTemplateContent, row);
+                FileGenerator.writeToFile(config.outputDir, "email-" + fileNumber + ".txt",
+                    filledEmail);
             }
 
             if (config.generateLetter) {
-                String filledLetter = TemplateProcessor.fillTemplate(letterTemplate, row);
-                FileGenerator.writeToFile(config.outputDir,
-                    "letter-" + fileNumber + ".txt", filledLetter);
+                String filledLetter = TemplateProcessor.fillTemplate(letterTemplateContent, row);
+                FileGenerator.writeToFile(config.outputDir, "letter-" + fileNumber + ".txt",
+                    filledLetter);
             }
+
+            fileNumber++;
         }
     }
 
+    /**
+     * Reads the full content of a text file.
+     *
+     * @param filePath path to the file
+     * @return file content as a String
+     * @throws IOException if the file cannot be read
+     */
+    private static String readFileContent(String filePath) throws IOException {
+        return Files.readString(Path.of(filePath), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Parses all command line arguments into a Config object.
+     *
+     * @param args command line arguments
+     * @return parsed configuration
+     */
     private static Config parseArguments(String[] args) {
+        if (args == null || args.length == 0) {
+            throw new IllegalArgumentException("No arguments were provided.");
+        }
+
         Config config = new Config();
         int index = 0;
 
@@ -107,6 +133,14 @@ public final class Main {
         return config;
     }
 
+    /**
+     * Reads the value following an option that requires one.
+     *
+     * @param args command line arguments
+     * @param index current index
+     * @param optionName option name
+     * @return the value after the option
+     */
     private static String readRequiredValue(String[] args, int index, String optionName) {
         if (index + 1 >= args.length || args[index + 1].startsWith("--")) {
             throw new IllegalArgumentException("Missing value for " + optionName + ".");
@@ -114,50 +148,60 @@ public final class Main {
         return args[index + 1];
     }
 
+    /**
+     * Validates that the parsed configuration is complete and legal.
+     *
+     * @param config parsed configuration
+     */
     private static void validateConfig(Config config) {
         if (!config.generateEmail && !config.generateLetter) {
             throw new IllegalArgumentException(
                 "You must provide --email, --letter, or both.");
         }
+
         if (config.generateEmail && config.emailTemplate == null) {
             throw new IllegalArgumentException(
                 "--email provided but no --email-template was given.");
         }
+
         if (config.generateLetter && config.letterTemplate == null) {
             throw new IllegalArgumentException(
                 "--letter provided but no --letter-template was given.");
         }
+
         if (config.outputDir == null) {
             throw new IllegalArgumentException("--output-dir is required.");
         }
+
         if (config.csvFile == null) {
             throw new IllegalArgumentException("--csv-file is required.");
         }
     }
 
+    /**
+     * Prints usage instructions.
+     */
     private static void printUsage() {
         System.out.println("Usage:");
-        System.out.println("--email Generate email messages. If this option is provided,");
-        System.out.println("        then --email-template must also be provided.");
-        System.out.println("--email-template <path/to/file> A filename for the email template.");
-        System.out.println("--letter Generate letters. If this option is provided,");
-        System.out.println("         then --letter-template must also be provided.");
-        System.out.println("--letter-template <path/to/file> A filename for the letter template.");
-        System.out.println("--output-dir <path/to/folder> The folder to store all generated files.");
-        System.out.println("--csv-file <path/to/file> The CSV file to process.");
+        System.out.println("--email Generate email files.");
+        System.out.println("--email-template <path> Path to email template.");
+        System.out.println("--letter Generate letter files.");
+        System.out.println("--letter-template <path> Path to letter template.");
+        System.out.println("--output-dir <path> Output directory.");
+        System.out.println("--csv-file <path> CSV input file.");
         System.out.println();
         System.out.println("Examples:");
         System.out.println("--email --email-template email-template.txt "
-            + "--output-dir emails --csv-file customer.csv");
+            + "--output-dir output --csv-file customer.csv");
         System.out.println("--letter --letter-template letter-template.txt "
-            + "--output-dir letters --csv-file customer.csv");
-        System.out.println("--email --email-template email-template.txt --letter "
-            + "--letter-template letter-template.txt --output-dir output "
-            + "--csv-file customer.csv");
+            + "--output-dir output --csv-file customer.csv");
+        System.out.println("--email --email-template email-template.txt "
+            + "--letter --letter-template letter-template.txt "
+            + "--output-dir output --csv-file customer.csv");
     }
 
     /**
-     * Stores all parsed command line options.
+     * Stores command line options.
      */
     private static class Config {
         private boolean generateEmail;
