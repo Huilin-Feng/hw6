@@ -1,0 +1,38 @@
+@startuml
+
+class Main {
+  +main(args: String[]): void
+  -parseArguments(args: String[]): Config
+  -validateConfig(config: Config): void
+  -generateFiles(config: Config): void
+  -readFileContent(filePath: String): String
+  -printUsage(): void
+}
+
+class CsvReader {
+  +read(filePath: String): List<Map<String, String>>
+}
+
+class TemplateProcessor {
+  +fillTemplate(template: String, rowData: Map<String, String>): String
+}
+
+class FileGenerator {
+  +writeToFile(outputDir: String, fileName: String, content: String): void
+}
+
+class Config {
+  -generateEmail: boolean
+  -generateLetter: boolean
+  -emailTemplate: String
+  -letterTemplate: String
+  -outputDir: String
+  -csvFile: String
+}
+
+Main ..> CsvReader
+Main ..> TemplateProcessor
+Main ..> FileGenerator
+Main *-- Config
+
+@enduml
